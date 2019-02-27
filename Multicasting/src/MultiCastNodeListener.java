@@ -1,12 +1,24 @@
 import java.io.*;
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
+import java.lang.management.ThreadMXBean;
 import java.net.*;
+import java.security.KeyStore.SecretKeyEntry;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -30,7 +42,7 @@ public class MultiCastNodeListener  implements Runnable{
 	 //creating a TreeMap to have ip and time inorder to find who left the group
 	  
 	  Map<String, String> tmap =  new ConcurrentHashMap<String, String>(); 
-	
+	   static Map<String, Integer> tmap1 =  new ConcurrentHashMap<String, Integer>();
 	 //declaring variables to calculate the time   
 	  
 	  int second, minute, hour;
@@ -71,7 +83,9 @@ public class MultiCastNodeListener  implements Runnable{
 
 	  }
 	  
- /*
+
+
+/*
   * Function Name : checkTime
   * Description   : To find the difference between the current time and the values in the map which has the 
   *                 updated time of the each node
@@ -118,6 +132,8 @@ public class MultiCastNodeListener  implements Runnable{
 				findActiveMembers(recv,val);
 				deleteKey(ipAddress);
 				System.out.println(ipAddress+" left the group");
+              // tmap1.replace(recv.toString(),0);
+               selectLeader(ipAddress, -1);
 				
 			}
 		} catch (ParseException e) {
@@ -152,13 +168,12 @@ public class MultiCastNodeListener  implements Runnable{
 	   return true; }
 	 else
 	 { System.out.println("Sorry ! We can't reach to this host"+ipAddress +" LEFT THE GROUP");
+
 	
 	 return false;}
 	} 
 	
-	  
-	  
-	  
+
 	  
 	  
 /*
@@ -168,11 +183,7 @@ public class MultiCastNodeListener  implements Runnable{
  * 
  */
 	  
-	  
- 
-	  
-	  
-	  
+  
 	  public void findActiveMembers(DatagramPacket recv,boolean val) throws UnknownHostException, IOException
 	  {
 		  set.add(recv.getAddress().toString());
@@ -211,20 +222,7 @@ public class MultiCastNodeListener  implements Runnable{
 	  
 	 public  void deleteKey(String packet)
 	 {
-			
-		   	/*Set<String> set = tmap.keySet();
-		    
-		    for(String values: set){
-		      
-		      if(values.contains(packet)){
-		        tmap.remove(values);
-		        System.out.println("DELETE KEYSSSSSSSSSSSSSSSSSSSSS");
-		        System.
-VALUES IN HASH MAP ARE 
-out.println(tmap);
-		      }
-		    }
-*/
+		
 		System.out.println("before "+tmap); 
 		 
 		 Iterator<String> iterator = tmap.keySet().iterator();
@@ -241,7 +239,55 @@ out.println(tmap);
 
 		System.out.println("after"+tmap);
 	 }
-	  
+	
+	 
+	 
+	
+	 public static void selectLeader(String packet,int count)
+	 {
+		 if(count==-1)
+		 {
+			 tmap1.put( packet,count);
+		 }
+		 
+		 tmap1.put( packet,count);
+		 int max=0;
+		 String ip=null;
+		 
+		 for (Map.Entry<String,Integer> entry : tmap1.entrySet())  
+	           
+		 {
+			 System.out.println("Key = " + entry.getKey() +  ", Value = " + entry.getValue()); 
+			 
+			 if(entry.getValue()>max)
+			 {
+				 max=entry.getValue();
+				 ip=entry.getKey();
+			 }
+		 }
+		 
+		 
+		 
+		 System.out.println("MAXIMUM VALUE*************"+max+"********* LEADER *********"+ip); 
+		 
+	 }
+	 
+	 
+	 public long processHandle()
+	 {
+		 RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
+		 
+			String jvmName = runtimeBean.getName();
+			//System.out.println("JVM Name = " + jvmName);
+			long pid = Long.valueOf(jvmName.split("@")[0]);
+		//	System.out.println("JVM PID  = " + pid);
+	 
+			ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+	 
+			int peakThreadCount = bean.getPeakThreadCount();
+			//System.out.println("Peak Thread Count = " + peakThreadCount);
+			return pid;
+	 }
 	  
 /*
  * Function Name : run
@@ -277,6 +323,8 @@ out.println(tmap);
 	      ioe.printStackTrace();      System.exit(1);
 
 	    }
+	    
+	    
 
 	    //creating a packet to transmit data
 	    
@@ -314,7 +362,7 @@ out.println(tmap);
 	 		         
 	 		     
 	 		         
-	 	   System.out.println("Multicast UDP message received from "+recv.getAddress()+"  is  "+msg1);
+	 	   System.out.println("Multicast UDP message received from "+recv.getAddress()+"  is  "+msg1+processHandle());
 	 		 
 
 	        byte[] buf = new byte[1000];
@@ -344,7 +392,8 @@ out.println(tmap);
 
 	          System.out.println("Received multicast packet: "+  value.intValue() + " from: " + packet.getAddress());
 	         
-	          //calling the setOperations method to store the ip 
+	          
+	          selectLeader(packet.getAddress().toString(),value.intValue());
 	          
 	          findActiveMembers(recv,false);
 	        } 
@@ -389,17 +438,10 @@ out.println(tmap);
 	        	
 	        	System.out.println("************"+tmap.values());
 	        	System.out.println("**********************SIZE OF MAP***************"+tmap.size());
-	        	/*for (Map.Entry<String ,String > m:tmap.entrySet()) {
+	        
 	        	
-	        		
-	        		//calling checkTime method to know if packets are transmitted at a given interval of time
-	        		
-		           checkTime(m.getValue().toString(),m.getKey().toString(),recv);
-		          
-		           
-		         //  System.out.println(m.getValue().toString()+"  ***************OK****************  "+m.getKey().toString());
-		      } */
-
+	        //selectLeader(value.intValue(), packet);
+	        
 	        	
 	        	Iterator<Map.Entry<String, String>> entries = tmap.entrySet().iterator();
 	        	
@@ -412,7 +454,7 @@ out.println(tmap);
 	        	  //calling checkTime method to know if packets are transmitted at a given interval of time
 	        		
 	        	    checkTime(entry.getValue().toString(),entry.getKey().toString(),recv);
-	        	    
+	        	 
 	        	    timer=0;
 	        	}
 	        		
